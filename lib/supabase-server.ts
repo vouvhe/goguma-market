@@ -1,0 +1,33 @@
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
+// 서버 컴포넌트 / Route Handler에서 사용
+export async function createServerSupabaseClient() {
+  const cookieStore = await cookies();
+
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co";
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder-key";
+
+  return createServerClient(
+    url,
+    key,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // 서버 컴포넌트에서 set은 무시됨
+          }
+        },
+      },
+    }
+  );
+}
