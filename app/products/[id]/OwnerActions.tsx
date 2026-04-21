@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase";
 import type { ProductStatus } from "@/types";
 
 interface OwnerActionsProps {
@@ -23,12 +22,15 @@ export default function OwnerActions({ productId, currentStatus }: OwnerActionsP
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   async function changeStatus(newStatus: ProductStatus) {
     setLoading(true);
     setShowStatusMenu(false);
-    await supabase.from("products").update({ status: newStatus }).eq("id", productId);
+    await fetch(`/api/products/${productId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
     setStatus(newStatus);
     setLoading(false);
     router.refresh();
@@ -36,7 +38,7 @@ export default function OwnerActions({ productId, currentStatus }: OwnerActionsP
 
   async function handleDelete() {
     setLoading(true);
-    await supabase.from("products").delete().eq("id", productId);
+    await fetch(`/api/products/${productId}`, { method: "DELETE" });
     router.push("/profile");
     router.refresh();
   }
@@ -73,7 +75,6 @@ export default function OwnerActions({ productId, currentStatus }: OwnerActionsP
           )}
         </div>
 
-        {/* 수정 버튼 */}
         <Link
           href={`/products/${productId}/edit`}
           className="px-3 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
@@ -81,7 +82,6 @@ export default function OwnerActions({ productId, currentStatus }: OwnerActionsP
           수정
         </Link>
 
-        {/* 삭제 버튼 */}
         <button
           onClick={() => setShowDeleteModal(true)}
           className="px-3 py-2 border border-red-200 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition"
@@ -90,7 +90,6 @@ export default function OwnerActions({ productId, currentStatus }: OwnerActionsP
         </button>
       </div>
 
-      {/* 삭제 확인 모달 */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm">

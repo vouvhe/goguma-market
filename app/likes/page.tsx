@@ -1,26 +1,38 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
 import ProductCard from "@/components/ProductCard";
-import type { Product } from "@/types";
+import type { Product, Category } from "@/types";
 
 export default async function LikesPage() {
-  const supabase = await createServerSupabaseClient();
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/login");
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const likes = await db.like.findMany({
+    where: { userId: currentUser.userId },
+    include: { product: { include: { user: true } } },
+    orderBy: { createdAt: "desc" },
+  });
 
-  const { data: likes } = await supabase
-    .from("likes")
-    .select("products(*, profiles(id, nickname, avatar_url))")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const products: Product[] = (likes ?? [])
-    .map((l: any) => l.products as Product | null)
-    .filter(Boolean) as Product[];
+  const products: Product[] = likes.map(({ product: p }) => ({
+    id: p.id,
+    user_id: p.userId,
+    title: p.title,
+    description: p.description,
+    price: p.price,
+    category: p.category as Category | null,
+    image_urls: JSON.parse(p.imageUrls) as string[],
+    status: p.status as Product["status"],
+    created_at: p.createdAt.toISOString(),
+    profiles: {
+      id: p.user.id,
+      nickname: p.user.nickname,
+      avatar_url: p.user.avatarUrl ?? null,
+      created_at: p.user.createdAt.toISOString(),
+    },
+  }));
 
   return (
     <div>

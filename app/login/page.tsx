@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -11,23 +10,21 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
 
-    if (error) {
-      if (error.message.includes("Email not confirmed")) {
-        setError("이메일 인증이 완료되지 않았습니다. 받은 메일함을 확인해 주세요.");
-      } else if (error.message.includes("Invalid login credentials")) {
-        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
-      } else {
-        setError("로그인에 실패했습니다. 다시 시도해 주세요.");
-      }
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error ?? "로그인에 실패했습니다.");
       setLoading(false);
       return;
     }
@@ -39,7 +36,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        {/* 로고 */}
         <div className="text-center mb-8">
           <span className="text-5xl">🍠</span>
           <h1 className="mt-2 text-2xl font-bold text-goguma-600">고구마마켓</h1>

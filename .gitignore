@@ -30,6 +30,16 @@ yarn-error.log*
 .claude/
 .mcp.json
 
+# prisma
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-journal
+
+# uploads
+public/uploads/*
+!public/uploads/.gitkeep
+
 # vercel
 .vercel
 

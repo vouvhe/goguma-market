@@ -3,8 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase";
-import type { Category, Product } from "@/types";
+import type { Category } from "@/types";
 
 const CATEGORIES: Category[] = [
   "디지털/가전",
@@ -20,16 +19,13 @@ const CATEGORIES: Category[] = [
 export default function EditProductPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<Category>("기타");
-  // 기존 이미지 URL (이미 업로드된)
   const [existingUrls, setExistingUrls] = useState<string[]>([]);
-  // 새로 추가한 파일
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [newPreviews, setNewPreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,17 +34,15 @@ export default function EditProductPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/login"); return; }
+      const meRes = await fetch("/api/auth/me");
+      const me = await meRes.json();
+      if (!me) { router.push("/login"); return; }
 
-      const { data: product } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single<Product>();
+      const res = await fetch(`/api/products/${id}`);
+      if (!res.ok) { router.push("/"); return; }
+      const product = await res.json();
 
-      if (!product) { router.push("/"); return; }
-      if (product.user_id !== user.id) { router.push(`/products/${id}`); return; }
+      if (product.user_id !== me.userId) { router.push(`/products/${id}`); return; }
 
       setTitle(product.title);
       setPrice(String(product.price));
@@ -58,7 +52,7 @@ export default function EditProductPage() {
       setFetching(false);
     }
     load();
-  }, [id]);
+  }, [id, router]);
 
   function removeExisting(index: number) {
     setExistingUrls((prev) => prev.filter((_, i) => i !== index));
@@ -86,44 +80,30 @@ export default function EditProductPage() {
     setError("");
     setLoading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return; }
-
     // 새 이미지 업로드
     const uploadedUrls: string[] = [];
     for (const file of newFiles) {
-      const ext = file.name.split(".").pop();
-      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("product-images")
-        .upload(fileName, file);
-
-      if (uploadError) {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) {
         setError("이미지 업로드에 실패했습니다.");
         setLoading(false);
         return;
       }
-
-      const { data: urlData } = supabase.storage
-        .from("product-images")
-        .getPublicUrl(fileName);
-      uploadedUrls.push(urlData.publicUrl);
+      const { url } = await res.json();
+      uploadedUrls.push(url);
     }
 
-    const finalUrls = [...existingUrls, ...uploadedUrls];
+    const imageUrls = [...existingUrls, ...uploadedUrls];
 
-    const { error: updateError } = await supabase
-      .from("products")
-      .update({
-        title,
-        price: parseInt(price),
-        description,
-        category,
-        image_urls: finalUrls,
-      })
-      .eq("id", id);
+    const res = await fetch(`/api/products/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, description, price: parseInt(price), category, imageUrls }),
+    });
 
-    if (updateError) {
+    if (!res.ok) {
       setError("수정에 실패했습니다.");
       setLoading(false);
       return;
@@ -153,7 +133,6 @@ export default function EditProductPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* 이미지 */}
         <div className="flex gap-3 flex-wrap">
           {totalImages < 5 && (
             <button
@@ -173,7 +152,6 @@ export default function EditProductPage() {
             onChange={handleNewImages}
             className="hidden"
           />
-          {/* 기존 이미지 */}
           {existingUrls.map((src, i) => (
             <div key={`ex-${i}`} className="relative w-20 h-20">
               <Image src={src} alt={`기존 ${i + 1}`} fill className="rounded-xl object-cover" />
@@ -186,7 +164,6 @@ export default function EditProductPage() {
               </button>
             </div>
           ))}
-          {/* 새 이미지 미리보기 */}
           {newPreviews.map((src, i) => (
             <div key={`new-${i}`} className="relative w-20 h-20">
               <Image src={src} alt={`새 ${i + 1}`} fill className="rounded-xl object-cover" />
@@ -201,7 +178,6 @@ export default function EditProductPage() {
           ))}
         </div>
 
-        {/* 제목 */}
         <input
           type="text"
           value={title}
@@ -212,7 +188,6 @@ export default function EditProductPage() {
           className="w-full border-b border-gray-200 py-3 text-base focus:outline-none focus:border-goguma-400"
         />
 
-        {/* 카테고리 */}
         <div>
           <label className="block text-sm text-gray-500 mb-2">카테고리</label>
           <div className="flex flex-wrap gap-2">
@@ -233,7 +208,6 @@ export default function EditProductPage() {
           </div>
         </div>
 
-        {/* 가격 */}
         <div className="flex items-center border-b border-gray-200 py-3">
           <span className="text-gray-500 mr-2">₩</span>
           <input
@@ -247,7 +221,6 @@ export default function EditProductPage() {
           />
         </div>
 
-        {/* 설명 */}
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}

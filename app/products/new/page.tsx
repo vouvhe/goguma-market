@@ -3,7 +3,6 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase";
 import type { Category } from "@/types";
 
 const CATEGORIES: Category[] = [
@@ -28,7 +27,6 @@ export default function NewProductPage() {
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const supabase = createClient();
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -38,8 +36,7 @@ export default function NewProductPage() {
     }
     setError("");
     setImages((prev) => [...prev, ...files]);
-    const newPreviews = files.map((f) => URL.createObjectURL(f));
-    setPreviews((prev) => [...prev, ...newPreviews]);
+    setPreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))]);
   }
 
   function removeImage(index: number) {
@@ -52,54 +49,36 @@ export default function NewProductPage() {
     setError("");
     setLoading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
     // 이미지 업로드
     const imageUrls: string[] = [];
     for (const image of images) {
-      const ext = image.name.split(".").pop();
-      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("product-images")
-        .upload(fileName, image);
-
-      if (uploadError) {
+      const formData = new FormData();
+      formData.append("file", image);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) {
         setError("이미지 업로드에 실패했습니다.");
         setLoading(false);
         return;
       }
-
-      const { data: urlData } = supabase.storage
-        .from("product-images")
-        .getPublicUrl(fileName);
-      imageUrls.push(urlData.publicUrl);
+      const { url } = await res.json();
+      imageUrls.push(url);
     }
 
     // 상품 저장
-    const { data: product, error: insertError } = await supabase
-      .from("products")
-      .insert({
-        user_id: user.id,
-        title,
-        price: parseInt(price),
-        description,
-        category,
-        image_urls: imageUrls,
-      })
-      .select()
-      .single();
+    const res = await fetch("/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, description, price: parseInt(price), category, imageUrls }),
+    });
 
-    if (insertError || !product) {
+    if (!res.ok) {
       setError("상품 등록에 실패했습니다.");
       setLoading(false);
       return;
     }
 
-    router.push(`/products/${product.id}`);
+    const { id } = await res.json();
+    router.push(`/products/${id}`);
   }
 
   return (
@@ -128,12 +107,7 @@ export default function NewProductPage() {
             />
             {previews.map((src, i) => (
               <div key={i} className="relative w-20 h-20">
-                <Image
-                  src={src}
-                  alt={`미리보기 ${i + 1}`}
-                  fill
-                  className="rounded-xl object-cover"
-                />
+                <Image src={src} alt={`미리보기 ${i + 1}`} fill className="rounded-xl object-cover" />
                 <button
                   type="button"
                   onClick={() => removeImage(i)}

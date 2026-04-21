@@ -1,48 +1,58 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
 import ProductCard from "@/components/ProductCard";
-import type { Product, Profile } from "@/types";
+import type { Product, Category } from "@/types";
 
 export default async function ProfilePage() {
-  const supabase = await createServerSupabaseClient();
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/login");
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = await db.user.findUnique({ where: { id: currentUser.userId } });
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single<Profile>();
+  const rows = await db.product.findMany({
+    where: { userId: currentUser.userId },
+    include: { user: true },
+    orderBy: { createdAt: "desc" },
+  });
 
-  const { data: products } = await supabase
-    .from("products")
-    .select("*, profiles(id, nickname, avatar_url)")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .returns<Product[]>();
+  const products: Product[] = rows.map((p) => ({
+    id: p.id,
+    user_id: p.userId,
+    title: p.title,
+    description: p.description,
+    price: p.price,
+    category: p.category as Category | null,
+    image_urls: JSON.parse(p.imageUrls) as string[],
+    status: p.status as Product["status"],
+    created_at: p.createdAt.toISOString(),
+    profiles: {
+      id: p.user.id,
+      nickname: p.user.nickname,
+      avatar_url: p.user.avatarUrl ?? null,
+      created_at: p.user.createdAt.toISOString(),
+    },
+  }));
 
   return (
     <div>
-      {/* 프로필 헤더 */}
       <div className="px-4 py-6 border-b border-gray-100 flex items-center gap-4">
         <div className="w-16 h-16 rounded-full bg-goguma-100 flex items-center justify-center text-3xl">
           🍠
         </div>
         <div>
-          <h1 className="text-xl font-bold">{profile?.nickname ?? "고구마 유저"}</h1>
-          <p className="text-sm text-gray-400">{user.email}</p>
+          <h1 className="text-xl font-bold">{user?.nickname ?? "고구마 유저"}</h1>
+          <p className="text-sm text-gray-400">{currentUser.email}</p>
         </div>
       </div>
 
-      {/* 내 판매 상품 */}
       <div className="px-4 py-4 border-b border-gray-100">
-        <h2 className="font-bold text-gray-900">판매 상품 ({products?.length ?? 0})</h2>
+        <h2 className="font-bold text-gray-900">판매 상품 ({products.length})</h2>
       </div>
 
-      {products && products.length > 0 ? (
+      {products.length > 0 ? (
         products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))

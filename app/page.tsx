@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { db } from "@/lib/db";
 import ProductCard from "@/components/ProductCard";
 import type { Product, Category } from "@/types";
 
@@ -21,18 +21,30 @@ interface HomeProps {
 
 export default async function HomePage({ searchParams }: HomeProps) {
   const { category } = await searchParams;
-  const supabase = await createServerSupabaseClient();
 
-  let query = supabase
-    .from("products")
-    .select("*, profiles(id, nickname, avatar_url)")
-    .order("created_at", { ascending: false });
+  const rows = await db.product.findMany({
+    where: category ? { category } : undefined,
+    include: { user: true },
+    orderBy: { createdAt: "desc" },
+  });
 
-  if (category) {
-    query = query.eq("category", category);
-  }
-
-  const { data: products } = await query.returns<Product[]>();
+  const products: Product[] = rows.map((p) => ({
+    id: p.id,
+    user_id: p.userId,
+    title: p.title,
+    description: p.description,
+    price: p.price,
+    category: p.category as Category | null,
+    image_urls: JSON.parse(p.imageUrls) as string[],
+    status: p.status as Product["status"],
+    created_at: p.createdAt.toISOString(),
+    profiles: {
+      id: p.user.id,
+      nickname: p.user.nickname,
+      avatar_url: p.user.avatarUrl ?? null,
+      created_at: p.user.createdAt.toISOString(),
+    },
+  }));
 
   return (
     <div>
@@ -66,7 +78,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
       </div>
 
       {/* 상품 목록 */}
-      {products && products.length > 0 ? (
+      {products.length > 0 ? (
         <div>
           {products.map((product) => (
             <ProductCard key={product.id} product={product} />

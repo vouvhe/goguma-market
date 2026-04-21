@@ -24,7 +24,7 @@ export interface Product {
   description: string | null;
   price: number;
   category: Category | null;
-  image_urls: string[] | null;
+  image_urls: string[];
   status: ProductStatus;
   created_at: string;
   profiles?: Profile;
@@ -35,4 +35,10 @@ export interface Like {
   user_id: string;
   product_id: string;
   created_at: string;
+}
+
+export interface CurrentUser {
+  userId: string;
+  email: string;
+  nickname: string;
 }

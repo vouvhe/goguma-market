@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
 
 interface LikeButtonProps {
   productId: string;
@@ -16,7 +15,6 @@ export default function LikeButton({ productId, isLiked: initialLiked, likeCount
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   async function toggle() {
     if (!userId) {
@@ -25,14 +23,11 @@ export default function LikeButton({ productId, isLiked: initialLiked, likeCount
     }
     setLoading(true);
 
-    if (isLiked) {
-      await supabase.from("likes").delete().eq("product_id", productId).eq("user_id", userId);
-      setIsLiked(false);
-      setCount((c) => c - 1);
-    } else {
-      await supabase.from("likes").insert({ product_id: productId, user_id: userId });
-      setIsLiked(true);
-      setCount((c) => c + 1);
+    const res = await fetch(`/api/products/${productId}/like`, { method: "POST" });
+    if (res.ok) {
+      const { liked } = await res.json();
+      setIsLiked(liked);
+      setCount((c) => c + (liked ? 1 : -1));
     }
     setLoading(false);
   }

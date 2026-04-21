@@ -3,26 +3,21 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
+import type { CurrentUser } from "@/types";
 
 export default function Header() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => listener.subscription.unsubscribe();
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => setUser(data));
   }, []);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
+    setUser(null);
     router.push("/");
     router.refresh();
   }
@@ -30,13 +25,11 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
       <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-        {/* 로고 */}
         <Link href="/" className="flex items-center gap-1">
           <span className="text-2xl">🍠</span>
           <span className="font-bold text-goguma-600 text-lg">고구마마켓</span>
         </Link>
 
-        {/* 우측 메뉴 */}
         <div className="flex items-center gap-3">
           {user ? (
             <>

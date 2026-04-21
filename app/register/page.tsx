@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -12,43 +11,28 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    // 1. Supabase Auth 회원가입 (nickname을 metadata로 전달 → 트리거가 profiles에 자동 저장)
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { nickname },
-      },
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, nickname }),
     });
 
-    if (signUpError) {
-      if (signUpError.message.includes("already registered")) {
-        setError("이미 사용 중인 이메일입니다.");
-      } else {
-        setError(signUpError.message ?? "회원가입에 실패했습니다.");
-      }
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error ?? "회원가입에 실패했습니다.");
       setLoading(false);
       return;
     }
 
-    // 이메일 인증이 필요한 경우 (session이 없음)
-    if (!data.session) {
-      setError("📧 가입 확인 이메일을 보냈습니다. 이메일을 확인한 뒤 로그인해 주세요.");
-      setLoading(false);
-      return;
-    }
-
-    // 이메일 인증 불필요한 경우 → 바로 홈으로
     router.push("/");
     router.refresh();
-    setLoading(false);
   }
 
   return (
@@ -107,9 +91,7 @@ export default function RegisterPage() {
           </div>
 
           {error && (
-            <p className={`text-sm text-center ${error.startsWith("📧") ? "text-blue-500" : "text-red-500"}`}>
-              {error}
-            </p>
+            <p className="text-sm text-red-500 text-center">{error}</p>
           )}
 
           <button
