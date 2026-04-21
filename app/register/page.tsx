@@ -2,37 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, nickname }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error ?? "회원가입에 실패했습니다.");
-      setLoading(false);
-      return;
-    }
-
-    router.push("/");
-    router.refresh();
+    alert("DB 무료 사용일자 초과");
   }
 
   return (
@@ -90,16 +68,11 @@ export default function RegisterPage() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-red-500 text-center">{error}</p>
-          )}
-
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-goguma-500 text-white py-3 rounded-xl font-medium hover:bg-goguma-600 transition disabled:opacity-50"
+            className="w-full bg-goguma-500 text-white py-3 rounded-xl font-medium hover:bg-goguma-600 transition"
           >
-            {loading ? "가입 중..." : "회원가입"}
+            회원가입
           </button>
         </form>
 

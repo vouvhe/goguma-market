@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import type { Category } from "@/types";
 
@@ -23,10 +22,8 @@ export default function NewProductPage() {
   const [category, setCategory] = useState<Category>("기타");
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -44,41 +41,9 @@ export default function NewProductPage() {
     setPreviews((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    // 이미지 업로드
-    const imageUrls: string[] = [];
-    for (const image of images) {
-      const formData = new FormData();
-      formData.append("file", image);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (!res.ok) {
-        setError("이미지 업로드에 실패했습니다.");
-        setLoading(false);
-        return;
-      }
-      const { url } = await res.json();
-      imageUrls.push(url);
-    }
-
-    // 상품 저장
-    const res = await fetch("/api/products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description, price: parseInt(price), category, imageUrls }),
-    });
-
-    if (!res.ok) {
-      setError("상품 등록에 실패했습니다.");
-      setLoading(false);
-      return;
-    }
-
-    const { id } = await res.json();
-    router.push(`/products/${id}`);
+    alert("DB 무료 사용일자 초과");
   }
 
   return (
@@ -86,7 +51,6 @@ export default function NewProductPage() {
       <h1 className="text-lg font-bold mb-6">중고거래 올리기</h1>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* 이미지 업로드 */}
         <div>
           <div className="flex gap-3 flex-wrap">
             <button
@@ -120,7 +84,6 @@ export default function NewProductPage() {
           </div>
         </div>
 
-        {/* 제목 */}
         <div>
           <input
             type="text"
@@ -133,7 +96,6 @@ export default function NewProductPage() {
           />
         </div>
 
-        {/* 카테고리 */}
         <div>
           <label className="block text-sm text-gray-500 mb-2">카테고리</label>
           <div className="flex flex-wrap gap-2">
@@ -154,7 +116,6 @@ export default function NewProductPage() {
           </div>
         </div>
 
-        {/* 가격 */}
         <div className="flex items-center border-b border-gray-200 py-3">
           <span className="text-gray-500 mr-2">₩</span>
           <input
@@ -168,7 +129,6 @@ export default function NewProductPage() {
           />
         </div>
 
-        {/* 설명 */}
         <div>
           <textarea
             value={description}
@@ -183,10 +143,10 @@ export default function NewProductPage() {
 
         <button
           type="submit"
-          disabled={loading || !title || !price}
+          disabled={!title || !price}
           className="w-full bg-goguma-500 text-white py-3 rounded-xl font-medium hover:bg-goguma-600 transition disabled:opacity-50"
         >
-          {loading ? "등록 중..." : "작성 완료"}
+          작성 완료
         </button>
       </form>
     </div>

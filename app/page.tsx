@@ -19,36 +19,42 @@ interface HomeProps {
   searchParams: Promise<{ category?: string }>;
 }
 
+async function loadProducts(category?: string): Promise<Product[]> {
+  try {
+    const rows = await db.product.findMany({
+      where: category ? { category } : undefined,
+      include: { user: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return rows.map((p) => ({
+      id: p.id,
+      user_id: p.userId,
+      title: p.title,
+      description: p.description,
+      price: p.price,
+      category: p.category as Category | null,
+      image_urls: JSON.parse(p.imageUrls) as string[],
+      status: p.status as Product["status"],
+      created_at: p.createdAt.toISOString(),
+      profiles: {
+        id: p.user.id,
+        nickname: p.user.nickname,
+        avatar_url: p.user.avatarUrl ?? null,
+        created_at: p.user.createdAt.toISOString(),
+      },
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export default async function HomePage({ searchParams }: HomeProps) {
   const { category } = await searchParams;
-
-  const rows = await db.product.findMany({
-    where: category ? { category } : undefined,
-    include: { user: true },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const products: Product[] = rows.map((p) => ({
-    id: p.id,
-    user_id: p.userId,
-    title: p.title,
-    description: p.description,
-    price: p.price,
-    category: p.category as Category | null,
-    image_urls: JSON.parse(p.imageUrls) as string[],
-    status: p.status as Product["status"],
-    created_at: p.createdAt.toISOString(),
-    profiles: {
-      id: p.user.id,
-      nickname: p.user.nickname,
-      avatar_url: p.user.avatarUrl ?? null,
-      created_at: p.user.createdAt.toISOString(),
-    },
-  }));
+  const products = await loadProducts(category);
 
   return (
     <div>
-      {/* 카테고리 필터 */}
       <div className="overflow-x-auto px-4 py-3 border-b border-gray-100">
         <div className="flex gap-2 min-w-max">
           <a
@@ -77,7 +83,6 @@ export default async function HomePage({ searchParams }: HomeProps) {
         </div>
       </div>
 
-      {/* 상품 목록 */}
       {products.length > 0 ? (
         <div>
           {products.map((product) => (

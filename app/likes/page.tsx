@@ -1,38 +1,43 @@
 export const dynamic = "force-dynamic";
 
-import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import ProductCard from "@/components/ProductCard";
 import type { Product, Category } from "@/types";
 
+async function loadLikes(userId: string): Promise<Product[]> {
+  try {
+    const likes = await db.like.findMany({
+      where: { userId },
+      include: { product: { include: { user: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return likes.map(({ product: p }) => ({
+      id: p.id,
+      user_id: p.userId,
+      title: p.title,
+      description: p.description,
+      price: p.price,
+      category: p.category as Category | null,
+      image_urls: JSON.parse(p.imageUrls) as string[],
+      status: p.status as Product["status"],
+      created_at: p.createdAt.toISOString(),
+      profiles: {
+        id: p.user.id,
+        nickname: p.user.nickname,
+        avatar_url: p.user.avatarUrl ?? null,
+        created_at: p.user.createdAt.toISOString(),
+      },
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export default async function LikesPage() {
   const currentUser = await getCurrentUser();
-  if (!currentUser) redirect("/login");
-
-  const likes = await db.like.findMany({
-    where: { userId: currentUser.userId },
-    include: { product: { include: { user: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const products: Product[] = likes.map(({ product: p }) => ({
-    id: p.id,
-    user_id: p.userId,
-    title: p.title,
-    description: p.description,
-    price: p.price,
-    category: p.category as Category | null,
-    image_urls: JSON.parse(p.imageUrls) as string[],
-    status: p.status as Product["status"],
-    created_at: p.createdAt.toISOString(),
-    profiles: {
-      id: p.user.id,
-      nickname: p.user.nickname,
-      avatar_url: p.user.avatarUrl ?? null,
-      created_at: p.user.createdAt.toISOString(),
-    },
-  }));
+  const products = currentUser ? await loadLikes(currentUser.userId) : [];
 
   return (
     <div>

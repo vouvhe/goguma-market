@@ -12,41 +12,56 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+async function loadProduct(id: string) {
+  try {
+    const p = await db.product.findUnique({ where: { id }, include: { user: true } });
+    if (!p) return null;
+
+    return {
+      id: p.id,
+      user_id: p.userId,
+      title: p.title,
+      description: p.description,
+      price: p.price,
+      category: p.category as Category | null,
+      image_urls: JSON.parse(p.imageUrls) as string[],
+      status: p.status as "selling" | "reserved" | "sold",
+      created_at: p.createdAt.toISOString(),
+      profiles: {
+        id: p.user.id,
+        nickname: p.user.nickname,
+        avatar_url: p.user.avatarUrl ?? null,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function loadLikeInfo(id: string, userId?: string) {
+  try {
+    const likeCount = await db.like.count({ where: { productId: id } });
+    let isLiked = false;
+    if (userId) {
+      const like = await db.like.findUnique({
+        where: { userId_productId: { userId, productId: id } },
+      });
+      isLiked = !!like;
+    }
+    return { likeCount, isLiked };
+  } catch {
+    return { likeCount: 0, isLiked: false };
+  }
+}
+
 export default async function ProductDetailPage({ params }: Props) {
   const { id } = await params;
 
-  const p = await db.product.findUnique({ where: { id }, include: { user: true } });
-  if (!p) notFound();
-
-  const product = {
-    id: p.id,
-    user_id: p.userId,
-    title: p.title,
-    description: p.description,
-    price: p.price,
-    category: p.category as Category | null,
-    image_urls: JSON.parse(p.imageUrls) as string[],
-    status: p.status as "selling" | "reserved" | "sold",
-    created_at: p.createdAt.toISOString(),
-    profiles: {
-      id: p.user.id,
-      nickname: p.user.nickname,
-      avatar_url: p.user.avatarUrl ?? null,
-      created_at: p.user.createdAt.toISOString(),
-    },
-  };
+  const product = await loadProduct(id);
+  if (!product) notFound();
 
   const currentUser = await getCurrentUser();
-
-  const likeCount = await db.like.count({ where: { productId: id } });
-
-  let isLiked = false;
-  if (currentUser) {
-    const like = await db.like.findUnique({
-      where: { userId_productId: { userId: currentUser.userId, productId: id } },
-    });
-    isLiked = !!like;
-  }
+  const { likeCount, isLiked } = await loadLikeInfo(id, currentUser?.userId);
 
   const STATUS_LABEL: Record<string, string> = {
     selling: "판매중",
